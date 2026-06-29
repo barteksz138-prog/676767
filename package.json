@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DirtDealFinder</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3352;
+    --accent: #4f8ef7;
+    --accent2: #7c5cfc;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e8eaf6;
+    --muted: #8890b0;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+  
+  /* LAYOUT */
+  .app { display: flex; flex-direction: column; height: 100vh; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--accent); }
+  header .tag { font-size: 11px; background: var(--accent2); color: #fff; padding: 2px 8px; border-radius: 20px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-left: auto; }
+  .status-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  nav { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
+  nav button { flex: 1; padding: 11px; background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav button:hover:not(.active) { color: var(--text); }
+
+  .content { flex: 1; overflow-y: auto; padding: 20px; }
+
+  /* CARDS & FORMS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .card h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; margin-top: 12px; }
+  label:first-of-type { margin-top: 0; }
+  input, textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px; color: var(--text); font-size: 13px; font-family: var(--font); outline: none; transition: border-color .15s; }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3b7de8; }
+  .btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-success:hover { background: #16a34a; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* SCANNER */
+  .scan-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .interval-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .interval-row input { width: 64px; text-align: center; }
+
+  /* RESULTS */
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .results-header span { font-size: 13px; color: var(--muted); }
+  .deal-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 10px; position: relative; }
+  .deal-card.good { border-left: 3px solid var(--green); }
+  .deal-card.skip { border-left: 3px solid var(--muted); opacity: .6; }
+  .deal-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .deal-meta { display: flex; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; margin-bottom: 8px; }
+  .deal-meta span { display: flex; align-items: center; gap: 4px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-full { background: #1e3a5f; color: #60a5fa; }
+  .badge-dirt { background: #3b1f1f; color: #f87171; }
+  .badge-other { background: #1f2937; color: var(--muted); }
+  .deal-verdict { font-size: 13px; color: var(--text); margin-top: 6px; padding: 8px; background: var(--bg); border-radius: 6px; line-height: 1.5; }
+  .deal-profit { font-size: 15px; font-weight: 700; color: var(--green); }
+  .deal-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .deal-link { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .deal-link:hover { text-decoration: underline; }
+
+  /* GEMINI CHAT */
+  .chat-wrap { display: flex; flex-direction: column; gap: 12px; }
+  .chat-msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.6; max-width: 85%; white-space: pre-wrap; }
+  .chat-msg.user { background: var(--accent); color: #fff; align-self: flex-end; }
+  .chat-msg.ai { background: var(--surface2); border: 1px solid var(--border); align-self: flex-start; }
+  .chat-msg.system-msg { background: var(--surface); border: 1px dashed var(--border); align-self: center; color: var(--muted); font-size: 12px; max-width: 95%; }
+  .chat-input-row { display: flex; gap: 8px; margin-top: 8px; }
+  .chat-input-row input { flex: 1; }
+  .chat-disclaimer { font-size: 11px; color: var(--muted); text-align: center; margin-top: 6px; }
+
+  /* SYSTEM PROMPT */
+  .sp-editor { position: relative; }
+  .sp-editor textarea { min-height: 220px; font-family: 'Courier New', monospace; font-size: 12px; }
+  .sp-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .sp-tag { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: var(--muted); cursor: pointer; }
+  .sp-tag:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* LOG */
+  .log { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 11px; font-family: monospace; color: var(--muted); max-height: 160px; overflow-y: auto; }
+  .log-line { padding: 1px 0; }
+  .log-line.ok { color: var(--green); }
+  .log-line.err { color: var(--red); }
+  .log-line.info { color: var(--accent); }
+
+  /* EMPTY / LOADER */
+  .empty { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 14px; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-row { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+
+  /* HISTORY INPUT */
+  .history-hint { font-size: 11px; color: var(--muted); margin-top: 4px; font-style: italic; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+/* =========================================================
+   STATE
+   ========================================================= */
+const S = {
+  tab: 'scanner',
+  settings: {
+    geminiKey: '',
+    webhookUrl: '',
+    threadId: '',
+    intervalMin: 15,
+    minProfit: 200,
+  },
+  // system prompt — user teaches Gemini here
+  systemPrompt: `Jesteś ekspertem od rynku rowerów MTB. Analizujesz ogłoszenia z Kleinanzeigen i oceniasz, czy warto kupić rower, aby odsprzedać go z zyskiem w Polsce.
+
+ZASADY KLASYFIKACJI TYPU:
+- "full" = rower z pełną amortyzacją (fullsus), np. Trek Slash, Specialized Enduro, Santa Cruz, YT, Norco, Transition, Canyon Strive, Forbidden, Propain
+- "dirt" = rower dirt jump / slopestyle, np. Specialized P.3, Dartmoor Two6player, Canyon Stitched, Trek Ticket, Commencal Absolut, Mondraker Summum Dirt
+- "inny" = wszystko inne: hardtail XC, szosówka, trekkingowy, miejski, elektryczny, gravel — ODRZUCAJ automatycznie
+
+ZASADY OCENY (tylko dla "full" i "dirt"):
+1. Sprawdź markę i model — premium marki (Santa Cruz, YT, Specialized, Canyon, Trek, Norco, Transition) osiągają wyższe ceny w Polsce
+2. Oszacuj realną wartość rynkową w Polsce (OLX, Allegro) na podstawie roku produkcji i stanu
+3. Policz zysk: cena_polska_PLN - (cena_niemcy_EUR × 4.3) - 300 (transport)
+4. Rekomenduj zakup tylko jeśli zysk ≥ 300 PLN i stosunek zysku do ryzyka jest dobry
+
+HISTORIA SPRZEDAŻY UŻYTKOWNIKA:
+{{HISTORIA}}
+
+FORMAT ODPOWIEDZI (zawsze JSON, bez markdown):
+{
+  "typ": "full" | "dirt" | "inny",
+  "marka": "nazwa marki",
+  "model": "pełna nazwa modelu",
+  "rok": 2020,
+  "stan": "opis stanu",
+  "cena_eur": 800,
+  "wartosc_pl_pln": 4500,
+  "zysk_pln": 1060,
+  "rekomendacja": true | false,
+  "uzasadnienie": "Krótkie 2-3 zdania po polsku dlaczego warto lub nie."
+}`,
+  // chat history for Gemini (teaching conversation)
+  chatHistory: [],
+  chatInput: '',
+  chatLoading: false,
+
+  // scanner
+  seen: new Set(JSON.parse(localStorage.getItem('seen') || '[]')),
+  results: [],
+  scanning: false,
+  scanTimer: null,
+  scanLog: [],
+  nextScanIn: 0,
+  countdownTimer: null,
+
+  // sales history
+  salesHistory: localStorage.getItem('salesHistory') || '',
+};
+
+function saveSeen() {
+  localStorage.setItem('seen', JSON.stringify([...S.seen].slice(-500)));
+}
+function saveSettings() {
+  localStorage.setItem('ddf_settings', JSON.stringify(S.settings));
+  localStorage.setItem('ddf_sp', S.systemPrompt);
+}
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('ddf_settings') || '{}');
+    Object.assign(S.settings, s);
+    S.systemPrompt = localStorage.getItem('ddf_sp') || S.systemPrompt;
+    S.salesHistory = localStorage.getItem('salesHistory') || '';
+  } catch(e) {}
+}
+loadSettings();
+
+/* =========================================================
+   URL BUILDER
+   ========================================================= */
+// MTB category with price filter 200-2000
+const MTB_URL = 'https://www.kleinanzeigen.de/s-fahrraeder/preis:200:2000/c217+fahrraeder.type_s:mountainbike';
+
+// Dirt models
+const DIRT_MODELS = [
+  { name: 'Specialized P.3', url: 'https://www.kleinanzeigen.de/s-fahrraeder/preis:200:2000/specialized-p3/k0c217' },
+  { name: 'Dartmoor Two6player', url: 'https://www.kleinanzeigen.de/s-fahrraeder/preis:200:2000/dartmoor-two6player/k0c217' },
+  { name: 'Canyon Stitched 360', url: 'https://www.kleinanzeigen.de/s-fahrraeder/preis:200:2000/canyon-stitched/k0c217' },
+  { name: 'Trek Ticket', url: 'https://www.kleinanzeigen.de/s-fahrraeder/preis:200:2000/trek-ticket/k0c217' },
+  { name: 'Rose The Bruce', url: 'https://www.kleinanzeigen.de/s-fahrraeder/preis:200:2000/rose-the-bruce/k0c217' },
+  { name: 'Radon Slush', url: 'https://www.kleinanzeigen.de/s-fahrraeder/preis:200:2000/radon-slush/k0c217' },
+];
+
+/* =========================================================
+   SCRAPING
+   ========================================================= */
+async function scrapeUrl(url) {
+  const proxy = '/api/scrape?url=' + encodeURIComponent(url);
+  const resp = await fetch(proxy);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const html = await resp.text();
+  return parseListings(html, url);
+}
+
+function parseListings(html, sourceUrl) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const items = [];
+
+  // Kleinanzeigen listing selectors (2024 layout)
+  const cards = doc.querySelectorAll('article.aditem, li[class*="aditem"], .ad-listitem article');
+  cards.forEach(card => {
+    try {
+      const titleEl = card.querySelector('[class*="ellipsis"], h2, .text-module-begin');
+      const priceEl = card.querySelector('[class*="aditem-main--middle--price"], .aditem-main--middle--price-shipping--price, strong');
+      const locEl = card.querySelector('[class*="aditem-main--top--left"], .aditem-main--top--left');
+      const linkEl = card.querySelector('a[href*="/s-anzeige/"]');
+      const imgEl = card.querySelector('img');
+
+      if (!titleEl || !linkEl) return;
+
+      const title = titleEl.textContent.trim();
+      const priceRaw = priceEl ? priceEl.textContent.trim() : '';
+      const price = parseFloat(priceRaw.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+      const location = locEl ? locEl.textContent.trim() : '';
+      const href = linkEl.getAttribute('href');
+      const id = href.match(/\/(\d+)-/)?.[1] || href;
+      const link = 'https://www.kleinanzeigen.de' + href;
+      const img = imgEl ? imgEl.src : '';
+
+      if (title.length > 5 && id) {
+        items.push({ id, title, price, location, link, img, source: sourceUrl });
+      }
+    } catch(e) {}
+  });
+
+  return items;
+}
+
+/* =========================================================
+   GEMINI
+   ========================================================= */
+function buildSystemPromptWithHistory() {
+  const hist = S.salesHistory.trim() || '(brak danych — oceń na podstawie ogólnej wiedzy rynkowej)';
+  return S.systemPrompt.replace('{{HISTORIA}}', hist);
+}
+
+async function askGemini(userMsg, conversationHistory) {
+  // Build messages: system prompt as first user turn (Gemini doesn't have system role)
+  const messages = [
+    { role: 'user', parts: [{ text: buildSystemPromptWithHistory() }] },
+    { role: 'model', parts: [{ text: 'Rozumiem. Jestem gotowy do analizy ogłoszeń. Podaj mi ogłoszenie.' }] },
+    ...conversationHistory,
+    { role: 'user', parts: [{ text: userMsg }] },
+  ];
+
+  const resp = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey: S.settings.geminiKey, messages }),
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return text;
+}
+
+async function analyzeListingWithGemini(listing) {
+  const prompt = `Oceń to ogłoszenie:\nTytuł: ${listing.title}\nCena: ${listing.price} EUR\nLokalizacja: ${listing.location}\nLink: ${listing.link}\n\nOdpowiedz tylko JSON.`;
+  const raw = await askGemini(prompt, []);
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
+}
+
+/* =========================================================
+   DISCORD
+   ========================================================= */
+async function sendDiscord(listing, analysis) {
+  const colorMap = { full: 0x60a5fa, dirt: 0xf87171 };
+  const payload = {
+    embeds: [{
+      title: `🚲 ${analysis.marka} ${analysis.model}`,
+      url: listing.link,
+      color: colorMap[analysis.typ] || 0x6b7280,
+      fields: [
+        { name: 'Typ', value: analysis.typ, inline: true },
+        { name: 'Cena DE', value: `${analysis.cena_eur} EUR`, inline: true },
+        { name: 'Wartość PL', value: `${analysis.wartosc_pl_pln} PLN`, inline: true },
+        { name: 'Zysk', value: `**+${analysis.zysk_pln} PLN**`, inline: true },
+        { name: 'Rok', value: String(analysis.rok || '?'), inline: true },
+        { name: 'Stan', value: analysis.stan || '?', inline: true },
+        { name: 'Ocena', value: analysis.uzasadnienie, inline: false },
+      ],
+      footer: { text: listing.location },
+      timestamp: new Date().toISOString(),
+    }],
+  };
+  await fetch('/api/discord', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ webhookUrl: S.settings.webhookUrl, threadId: S.settings.threadId, payload }),
+  });
+}
+
+/* =========================================================
+   SCAN LOOP
+   ========================================================= */
+function addLog(msg, type = '') {
+  S.scanLog.unshift({ msg, type, ts: new Date().toLocaleTimeString() });
+  if (S.scanLog.length > 100) S.scanLog.pop();
+}
+
+async function runScan() {
+  if (!S.settings.geminiKey) { addLog('Brak klucza Gemini API', 'err'); render(); return; }
+  S.scanning = true;
+  addLog('Rozpoczynam skan…', 'info');
+  render();
+
+  const allUrls = [
+    { name: 'MTB Full/Dirt', url: MTB_URL },
+    ...DIRT_MODELS,
+  ];
+
+  let newCount = 0;
+
+  for (const source of allUrls) {
+    try {
+      addLog(`Skanuję: ${source.name}`);
+      render();
+      const listings = await scrapeUrl(source.url);
+      addLog(`Znaleziono ${listings.length} ogłoszeń`, 'ok');
+
+      const fresh = listings.filter(l => !S.seen.has(l.id));
+      addLog(`Nowych: ${fresh.length}`);
+
+      for (const listing of fresh) {
+        S.seen.add(listing.id);
+        saveSeen();
+        try {
+          const analysis = await analyzeListingWithGemini(listing);
+          const result = { listing, analysis, ts: Date.now() };
+          S.results.unshift(result);
+          if (S.results.length > 200) S.results.pop();
+
+          if (analysis.typ !== 'inny' && analysis.rekomendacja && analysis.zysk_pln >= S.settings.minProfit) {
+            newCount++;
+            addLog(`✅ Okazja: ${listing.title} (+${analysis.zysk_pln} PLN)`, 'ok');
+            if (S.settings.webhookUrl) {
+              await sendDiscord(listing, analysis);
+              addLog('Discord wysłany', 'ok');
+            }
+          } else if (analysis.typ !== 'inny') {
+            addLog(`⏩ Pominięto: ${listing.title}`);
+          }
+          render();
+          // small delay to avoid rate limits
+          await new Promise(r => setTimeout(r, 800));
+        } catch(e) {
+          addLog(`Błąd Gemini: ${e.message}`, 'err');
+        }
+      }
+    } catch(e) {
+      addLog(`Błąd scrape ${source.name}: ${e.message}`, 'err');
+    }
+  }
+
+  S.scanning = false;
+  addLog(`Skan gotowy. Okazji: ${newCount}`, newCount > 0 ? 'ok' : '');
+  scheduleNext();
+  render();
+}
+
+function scheduleNext() {
+  if (S.countdownTimer) clearInterval(S.countdownTimer);
+  S.nextScanIn = S.settings.intervalMin * 60;
+  S.countdownTimer = setInterval(() => {
+    S.nextScanIn--;
+    if (S.nextScanIn <= 0) {
+      clearInterval(S.countdownTimer);
+      S.countdownTimer = null;
+      runScan();
+    }
+    // update countdown without full re-render
+    const el = document.getElementById('countdown');
+    if (el) {
+      const m = Math.floor(S.nextScanIn / 60);
+      const s = S.nextScanIn % 60;
+      el.textContent = `Następny skan za ${m}:${String(s).padStart(2, '0')}`;
+    }
+  }, 1000);
+}
+
+function stopScan() {
+  if (S.countdownTimer) { clearInterval(S.countdownTimer); S.countdownTimer = null; }
+  S.scanning = false;
+  S.nextScanIn = 0;
+  addLog('Zatrzymano.', 'info');
+  render();
+}
+
+/* =========================================================
+   CHAT (teaching Gemini)
+   ========================================================= */
+async function sendChat(msg) {
+  if (!msg.trim() || !S.settings.geminiKey) return;
+  S.chatHistory.push({ role: 'user', parts: [{ text: msg }] });
+  S.chatLoading = true;
+  render();
+  try {
+    // Pass conversation history excluding last user msg (it's appended inside askGemini)
+    const historyWithoutLast = S.chatHistory.slice(0, -1);
+    const reply = await askGemini(msg, historyWithoutLast);
+    S.chatHistory.push({ role: 'model', parts: [{ text: reply }] });
+  } catch(e) {
+    S.chatHistory.push({ role: 'model', parts: [{ text: `❌ Błąd: ${e.message}` }] });
+  }
+  S.chatLoading = false;
+  render();
+  setTimeout(() => {
+    const c = document.getElementById('chat-scroll');
+    if (c) c.scrollTop = c.scrollHeight;
+  }, 50);
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+function render() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    ${renderHeader()}
+    ${renderNav()}
+    <div class="content">
+      ${S.tab === 'scanner' ? renderScanner() : ''}
+      ${S.tab === 'results' ? renderResults() : ''}
+      ${S.tab === 'gemini' ? renderGeminiChat() : ''}
+      ${S.tab === 'settings' ? renderSettings() : ''}
+    </div>
+  `;
+  attachEvents();
+}
+
+function renderHeader() {
+  const active = S.countdownTimer || S.scanning;
+  return `
+    <header>
+      <span style="font-size:20px">🚲</span>
+      <h1>DirtDealFinder</h1>
+      <span class="tag">v2</span>
+      <div class="status-dot ${active ? 'active' : ''}"></div>
+    </header>`;
+}
+
+function renderNav() {
+  const tabs = [
+    ['scanner', '⚡ Skaner'],
+    ['results', `📋 Wyniki (${S.results.filter(r=>r.analysis.rekomendacja && r.analysis.typ!=='inny').length})`],
+    ['gemini', '🤖 Chat Gemini'],
+    ['settings', '⚙️ Ustawienia'],
+  ];
+  return `<nav>${tabs.map(([id, label]) => `<button class="${S.tab === id ? 'active' : ''}" data-tab="${id}">${label}</button>`).join('')}</nav>`;
+}
+
+function renderScanner() {
+  const m = Math.floor(S.nextScanIn / 60);
+  const sec = S.nextScanIn % 60;
+  return `
+    <div class="card">
+      <h3>Sterowanie</h3>
+      <div class="scan-controls">
+        <button class="btn btn-success" id="btn-scan" ${S.scanning ? 'disabled' : ''}>
+          ${S.scanning ? '<span class="spinner"></span> Skanuję…' : '▶ Skanuj teraz'}
+        </button>
+        <button class="btn btn-danger btn-sm" id="btn-stop">■ Stop</button>
+        <div class="interval-row">
+          Auto co <input type="number" id="inp-interval" value="${S.settings.intervalMin}" min="5" max="120" style="width:54px">min
+        </div>
+      </div>
+      ${S.nextScanIn > 0 ? `<div id="countdown" style="font-size:12px;color:var(--muted)">Następny skan za ${m}:${String(sec).padStart(2,'0')}</div>` : ''}
+    </div>
+    <div class="card">
+      <h3>Co skanuje?</h3>
+      <div style="font-size:13px;color:var(--muted);line-height:1.8">
+        <div>🏔️ <strong style="color:var(--text)">MTB Full/Dirt</strong> — kleinanzeigen.de, MTB, cena 200–2000€</div>
+        ${DIRT_MODELS.map(m => `<div>🚲 <strong style="color:var(--text)">${m.name}</strong></div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <h3>Log</h3>
+      <div class="log" id="scan-log">
+        ${S.scanLog.length === 0 ? '<div class="log-line">Brak aktywności.</div>' :
+          S.scanLog.slice(0, 40).map(l => `<div class="log-line ${l.type}">[${l.ts}] ${l.msg}</div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderResults() {
+  const all = S.results;
+  if (all.length === 0) return `<div class="empty">Brak wyników. Uruchom skan ➜ zakładka Skaner.</div>`;
+
+  return `
+    <div class="results-header">
+      <span>${all.length} przeanalizowanych</span>
+      <button class="btn btn-ghost btn-sm" id="btn-clear-results">Wyczyść</button>
+    </div>
+    ${all.map((r, i) => renderDealCard(r, i)).join('')}`;
+}
+
+function renderDealCard(r, i) {
+  const a = r.analysis;
+  const l = r.listing;
+  const good = a.rekomendacja && a.typ !== 'inny' && a.zysk_pln >= S.settings.minProfit;
+  const badgeClass = a.typ === 'full' ? 'badge-full' : a.typ === 'dirt' ? 'badge-dirt' : 'badge-other';
+
+  return `
+    <div class="deal-card ${good ? 'good' : 'skip'}">
+      <div class="deal-title">${l.title}</div>
+      <div class="deal-meta">
+        <span>💶 ${l.price} EUR</span>
+        <span>📍 ${l.location}</span>
+        <span class="badge ${badgeClass}">${a.typ || '?'}</span>
+        ${good ? `<span class="deal-profit">+${a.zysk_pln} PLN</span>` : ''}
+      </div>
+      ${a.uzasadnienie ? `<div class="deal-verdict">${a.uzasadnienie}</div>` : ''}
+      <div class="deal-actions">
+        <a href="${l.link}" target="_blank" class="deal-link">🔗 Otwórz ogłoszenie</a>
+        ${good && S.settings.webhookUrl ? `<button class="btn btn-ghost btn-sm" data-discord="${i}">📤 Discord</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderGeminiChat() {
+  const hasKey = !!S.settings.geminiKey;
+  return `
+    <div class="card">
+      <h3>System Prompt — naucz Gemini oceniać rowery</h3>
+      <div class="sp-editor">
+        <textarea id="sp-textarea" rows="10">${S.systemPrompt}</textarea>
+      </div>
+      <div class="sp-tags">
+        <span class="sp-tag" data-insert="{{HISTORIA}}">+ Historia sprzedaży</span>
+        <span class="sp-tag" data-insert="full / dirt / inny">+ Typy</span>
+        <span class="sp-tag" data-insert="cena_eur × 4.3">+ Kurs EUR→PLN</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:10px" id="btn-save-sp">💾 Zapisz prompt</button>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:0">
+      <h3>Rozmowa z Gemini</h3>
+      ${!hasKey ? '<div style="color:var(--red);font-size:13px">⚠️ Uzupełnij klucz Gemini API w Ustawieniach.</div>' : ''}
+      <div id="chat-scroll" style="max-height:380px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 0 10px">
+        ${S.chatHistory.length === 0 ?
+          `<div class="chat-msg system-msg">Napisz do Gemini — np. "Jakie marki fullsusów są teraz popularne w Niemczech?" albo wklej ogłoszenie do oceny. System prompt z Twoją historią sprzedaży jest już załadowany.</div>` :
+          S.chatHistory.map(m => `<div class="chat-msg ${m.role === 'user' ? 'user' : 'ai'}">${m.parts[0].text}</div>`).join('')
+        }
+        ${S.chatLoading ? '<div class="loading-row"><span class="spinner"></span> Gemini myśli…</div>' : ''}
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Napisz wiadomość…" value="${S.chatInput}" ${!hasKey || S.chatLoading ? 'disabled' : ''}/>
+        <button class="btn btn-primary" id="btn-chat-send" ${!hasKey || S.chatLoading ? 'disabled' : ''}>Wyślij</button>
+      </div>
+      <div class="chat-disclaimer">Gemini nie pamięta rozmów między sesjami — historia jest przechowywana w przeglądarce.</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;align-self:flex-start" id="btn-clear-chat">🗑 Wyczyść chat</button>
+    </div>`;
+}
+
+function renderSettings() {
+  return `
+    <div class="card">
+      <h3>Gemini API</h3>
+      <label>Klucz API (aistudio.google.com/apikey)</label>
+      <input type="password" id="inp-gemini" value="${S.settings.geminiKey}" placeholder="AIza…"/>
+    </div>
+    <div class="card">
+      <h3>Discord</h3>
+      <label>Webhook URL</label>
+      <input type="text" id="inp-webhook" value="${S.settings.webhookUrl}" placeholder="https://discord.com/api/webhooks/…"/>
+      <label>Thread ID (opcjonalne)</label>
+      <input type="text" id="inp-thread" value="${S.settings.threadId}" placeholder="np. 1234567890"/>
+    </div>
+    <div class="card">
+      <h3>Progi</h3>
+      <label>Minimalny zysk (PLN)</label>
+      <input type="number" id="inp-profit" value="${S.settings.minProfit}" min="50"/>
+    </div>
+    <div class="card">
+      <h3>Historia sprzedaży</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px">Wpisz rowery które już sprzedałeś — jeden rower na linię. Gemini użyje tych danych do lepszej oceny.</p>
+      <textarea id="inp-history" placeholder="Przykład:&#10;Trek Slash 9.8 2020 — kupiłem 2500€, sprzedałem 5200 PLN, zysk ~950 PLN&#10;YT Jeffsy 29 CF 2019 — kupiłem 1800€, sprzedałem 4400 PLN, zysk ~660 PLN&#10;Dartmoor Two6player 2021 — kupiłem 600€, sprzedałem 1800 PLN, zysk ~220 PLN">${S.salesHistory}</textarea>
+      <div class="history-hint">Format dowolny — Gemini rozumie naturalny opis. Im więcej danych, tym dokładniejsza wycena.</div>
+    </div>
+    <button class="btn btn-primary" id="btn-save-settings">💾 Zapisz ustawienia</button>
+  `;
+}
+
+/* =========================================================
+   EVENTS
+   ========================================================= */
+function attachEvents() {
+  // Nav tabs
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => { S.tab = btn.dataset.tab; render(); });
+  });
+
+  // Scanner
+  const btnScan = document.getElementById('btn-scan');
+  if (btnScan) btnScan.addEventListener('click', () => runScan());
+  const btnStop = document.getElementById('btn-stop');
+  if (btnStop) btnStop.addEventListener('click', stopScan);
+  const inpInterval = document.getElementById('inp-interval');
+  if (inpInterval) inpInterval.addEventListener('change', e => { S.settings.intervalMin = parseInt(e.target.value) || 15; });
+
+  // Results
+  const btnClear = document.getElementById('btn-clear-results');
+  if (btnClear) btnClear.addEventListener('click', () => { S.results = []; render(); });
+  document.querySelectorAll('[data-discord]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const r = S.results[parseInt(btn.dataset.discord)];
+      if (r) sendDiscord(r.listing, r.analysis).then(() => addLog('Discord wysłany ręcznie', 'ok'));
+    });
+  });
+
+  // Gemini chat
+  const spTextarea = document.getElementById('sp-textarea');
+  if (spTextarea) spTextarea.addEventListener('input', e => { S.systemPrompt = e.target.value; });
+  const btnSaveSp = document.getElementById('btn-save-sp');
+  if (btnSaveSp) btnSaveSp.addEventListener('click', () => { saveSettings(); btnSaveSp.textContent = '✅ Zapisano!'; setTimeout(() => { if(btnSaveSp) btnSaveSp.textContent = '💾 Zapisz prompt'; }, 1500); });
+  document.querySelectorAll('[data-insert]').forEach(tag => {
+    tag.addEventListener('click', () => {
+      const ta = document.getElementById('sp-textarea');
+      if (ta) { ta.value += '\n' + tag.dataset.insert; S.systemPrompt = ta.value; }
+    });
+  });
+
+  const chatInput = document.getElementById('chat-input');
+  const btnSend = document.getElementById('btn-chat-send');
+  if (chatInput) {
+    chatInput.addEventListener('input', e => { S.chatInput = e.target.value; });
+    chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const msg = S.chatInput; S.chatInput = ''; sendChat(msg); } });
+  }
+  if (btnSend) btnSend.addEventListener('click', () => { const msg = S.chatInput; S.chatInput = ''; sendChat(msg); });
+  const btnClearChat = document.getElementById('btn-clear-chat');
+  if (btnClearChat) btnClearChat.addEventListener('click', () => { S.chatHistory = []; render(); });
+
+  // Settings
+  const inpGemini = document.getElementById('inp-gemini');
+  const inpWebhook = document.getElementById('inp-webhook');
+  const inpThread = document.getElementById('inp-thread');
+  const inpProfit = document.getElementById('inp-profit');
+  const inpHistory = document.getElementById('inp-history');
+  if (inpGemini) inpGemini.addEventListener('input', e => { S.settings.geminiKey = e.target.value; });
+  if (inpWebhook) inpWebhook.addEventListener('input', e => { S.settings.webhookUrl = e.target.value; });
+  if (inpThread) inpThread.addEventListener('input', e => { S.settings.threadId = e.target.value; });
+  if (inpProfit) inpProfit.addEventListener('input', e => { S.settings.minProfit = parseInt(e.target.value) || 200; });
+  if (inpHistory) inpHistory.addEventListener('input', e => { S.salesHistory = e.target.value; localStorage.setItem('salesHistory', S.salesHistory); });
+  const btnSaveSettings = document.getElementById('btn-save-settings');
+  if (btnSaveSettings) btnSaveSettings.addEventListener('click', () => { saveSettings(); btnSaveSettings.textContent = '✅ Zapisano!'; setTimeout(() => { if(btnSaveSettings) btnSaveSettings.textContent = '💾 Zapisz ustawienia'; }, 1500); });
+}
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+render();
+</script>
+</body>
+</html>
